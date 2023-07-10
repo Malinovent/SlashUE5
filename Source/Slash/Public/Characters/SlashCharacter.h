@@ -16,8 +16,8 @@ class USpringArmComponent;
 class UCameraComponent;
 class UGroomComponent;
 class AItem;
-
-
+class UAnimMontage;
+class AWeapon;
 
 UCLASS()
 class SLASH_API ASlashCharacter : public ACharacter
@@ -25,7 +25,12 @@ class SLASH_API ASlashCharacter : public ACharacter
 	GENERATED_BODY()
 private:
 	ECharacterState CharacterState = ECharacterState::ECS_Unequipped;
-	
+
+	UPROPERTY(BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	EActionState ActionState = EActionState::EAS_Unoccupied;
+
+	UPROPERTY(VisibleAnywhere, Category = Weapon)
+	AWeapon* EquippedWeapon;
 public:
 	// Sets default values for this character's properties
 	ASlashCharacter();
@@ -33,7 +38,12 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-
+	UFUNCTION(BlueprintCallable)
+	void Disarm();
+	UFUNCTION(BlueprintCallable)
+	void Arm();
+	UFUNCTION(BlueprintCallable)
+	void FinishEquipping();
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -41,7 +51,8 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	
+	UFUNCTION(BlueprintCallable)
+	void SetWeaponCollisionEnabled(ECollisionEnabled::Type CollisionEnabled);
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
 	UInputMappingContext* SlashCharacterMappingContext;
@@ -57,6 +68,12 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
 	UInputAction* EquipAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
+	UInputAction* AttackAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
+	UInputAction* SwitchWeaponAction;
 	
 	UPROPERTY(VisibleAnywhere)
 	USpringArmComponent* SpringArm;
@@ -73,10 +90,37 @@ public:
 	UPROPERTY(VisibleInstanceOnly)
 	AItem* OverlappingItem;
 
+	/**
+	 * @brief Animation Montages
+	 * @param Value 
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = Montages)
+	UAnimMontage* AttackMontage;
+
+	UPROPERTY(EditDefaultsOnly, Category = Montages)
+	UAnimMontage* EquipMontage;
+	/**
+	 * @brief Calbacks for input
+	 * @param  
+	 */
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
 	void EKeyPressed(const FInputActionValue& Value);
+	void Attack(const FInputActionValue& Value);
+	void SwitchWeapon(const FInputActionValue& Value);
 
+	/**
+	 * @brief Play Montage Functions
+	 * @param  
+	 */
+	void PlayAttackMontage() const;
+	void PlayEquipMontage(FName SectionName) const;
+	
+	UFUNCTION(BlueprintCallable)
+	void AttackEnd();
+	bool CanAttack() const;
+	bool CanDisarm() const;
+	bool CanArm() const;
 public:
 	FORCEINLINE void SetOverlappingItem(AItem* Item) { OverlappingItem = Item; }
 	FORCEINLINE AItem* GetOverlappingItem() const { return OverlappingItem; }
