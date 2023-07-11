@@ -6,6 +6,7 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "AIController.h"
 #include "Slash/DebugMacros.h"
 #include "Animation/AnimMontage.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -42,6 +43,13 @@ void AEnemy::BeginPlay()
 	{
 		HealthBarWidget->SetVisibility(false);
 	}
+	
+	//Cache the AI Controller, Check the AI Controller documentation
+	EnemyController = Cast<AAIController>(GetController());
+
+	MoveToTarget(CurrentPatrolTarget);
+
+	
 }
 
 void AEnemy::GetHit_Implementation(const FVector& ImpactPoint)
@@ -122,20 +130,33 @@ float AEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AC
 }
 
 
+void AEnemy::CheckCombatTarget()
+{
+	//If there is no combat target in the combat radius, then go back to business
+	if(!InTargetRange(CombatTarget, CombatRadius))
+	{
+		CombatTarget = nullptr;
+		if(HealthBarWidget) HealthBarWidget->SetVisibility(false);
+	}
+}
+
+void AEnemy::CheckPatrolTarget()
+{
+	if(InTargetRange(CurrentPatrolTarget, PatrolRadius))
+	{
+		CurrentPatrolTarget = ChoosePatrolTarget();
+		//MoveToTarget(CurrentPatrolTarget);
+		GetWorldTimerManager().SetTimer(PatrolTimer, this, &AEnemy::PatrolTimerFinished, FMath::RandRange(WaitMin, WaitMax)); //Gets the world timer manager
+	}
+}
+
 void AEnemy::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if(CombatTarget)
-	{
-		const double DistanceToTarget = (CombatTarget->GetActorLocation() - GetActorLocation()).Size();
-		if(DistanceToTarget > CombatRadius)
-		{
-			CombatTarget = nullptr;
-			if(HealthBarWidget) HealthBarWidget->SetVisibility(false);
-		}
-		
-	}
+	CheckCombatTarget();
+	CheckPatrolTarget();
+	
 }
 
 
@@ -169,7 +190,67 @@ void AEnemy::Die()
 		if(HealthBarWidget) HealthBarWidget->SetVisibility(false);
 		SetLifeSpan(3.f);
 	}
+}
 
+bool AEnemy::InTargetRange(const AActor* Target, double Radius) const
+{
+	if(Target == nullptr) return false;
 	
+	const double DistanceToTarget = (Target->GetActorLocation() - GetActorLocation()).Size();
+
+	DRAW_SPHERE_SINGLEFRAME(GetActorLocation(), FColor::Green);
+	DRAW_SPHERE_SINGLEFRAME(Target->GetActorLocation(), FColor::Red);
+	
+	
+	return DistanceToTarget <= Radius;
+}
+
+void AEnemy::MoveToTarget(AActor* Target)
+{
+	if(EnemyController == nullptr || Target == nullptr) return;
+
+	FAIMoveRequest MoveRequest;
+	MoveRequest.SetGoalActor(Target);
+	MoveRequest.SetAcceptanceRadius(15.f);
+	EnemyController->MoveTo(MoveRequest);
+	//TArray<FNavPathPoint>& PathPoints = NavPath->GetPathPoints(); //Return a TArray of pathpoints on the navmesh
+	
+	
+	/*
+	//Set the AI's move to patrol target
+	if(EnemyController && CurrentPatrolTarget)
+	{
+		FAIMoveRequest MoveRequest;
+		MoveRequest.SetGoalActor(CurrentPatrolTarget);
+		MoveRequest.SetAcceptanceRadius(15.f);
+		FNavPathSharedPtr NavPath;
+		EnemyController->MoveTo(MoveRequest, &NavPath);
+		TArray<FNavPathPoint>& PathPoints = NavPath->GetPathPoints(); //Return a TArray of pathpoints on the navmesh
+	}
+	*/
+}
+
+AActor* AEnemy::ChoosePatrolTarget()
+{
+	if(PatrolTargets.Num() <= 1){ return nullptr; }
+
+	//GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, FString::Printf(TEXT("In Target Range")));
+	TArray<AActor*> ValidTargets;
+
+	for(AActor* Target : PatrolTargets)
+	{
+		if(Target != CurrentPatrolTarget)
+		{
+			ValidTargets.AddUnique(Target);
+		}
+	}
+	
+	//GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, FString::Printf(TEXT("Looking for patrol target")));
+	return  ValidTargets[FMath::RandRange(0, ValidTargets.Num() - 1)];
+}
+
+void AEnemy::PatrolTimerFinished()
+{
+	MoveToTarget(CurrentPatrolTarget);
 }
 

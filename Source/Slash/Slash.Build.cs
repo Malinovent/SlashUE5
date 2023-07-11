@@ -18,7 +18,8 @@ public class Slash : ModuleRules
 			"HairStrandsCore",
 			"Niagara",
 			"GeometryCollectionEngine",
-			"UMG"
+			"UMG",
+			"AIModule"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });

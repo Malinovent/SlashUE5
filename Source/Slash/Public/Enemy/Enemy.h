@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AIController.h"
 #include "GameFramework/Character.h"
 #include "Interfaces/HitInterface.h"
 #include "Characters/CharacterTypes.h"
@@ -11,6 +12,7 @@
 class UAnimMontage;
 class UAttributeComponent; 
 class UHealthBarComponent;
+class AIController;
 
 UCLASS()
 class SLASH_API AEnemy : public ACharacter, public IHitInterface
@@ -24,14 +26,35 @@ public:
 	virtual void GetHit_Implementation(const FVector& ImpactPoint) override;
 	void DirectionalHitReact(const FVector& ImpactPoint);
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+	void CheckCombatTarget();
+	void CheckPatrolTarget();
+
+	UPROPERTY()
+	AAIController* EnemyController;
+	/**
+	* Navigation: Create an array of Patrol Targets, a current target and set them to be accessible in the editor
+	*/
+	UPROPERTY(EditAnywhere, Category = "AI Navigation")
+	AActor* CurrentPatrolTarget;
+	
+	UPROPERTY(EditAnywhere, Category = "AI Navigation")
+	TArray<AActor*> PatrolTargets;
+
+	UPROPERTY(EditAnywhere, Category = "AI Navigation")
+	double PatrolRadius = 200.f;
 	
 protected:
 	virtual void BeginPlay() override;
 	void PlayHitReactMontage(FName SectionName);
 	void Die();
-
+	bool InTargetRange(const AActor* Target, double Radius) const;
+	void MoveToTarget(AActor* Target);
+	AActor* ChoosePatrolTarget();
+	
 	UPROPERTY(BlueprintReadWrite)
 	EEnemyState CurrentState = EEnemyState::EES_Idle;
+
+	
 
 private:
 	
@@ -57,7 +80,15 @@ private:
 	AActor* CombatTarget;
 	
 	UPROPERTY(EditAnywhere)
-	double CombatRadius = 500.f;
+	double CombatRadius = 50.f;
+
+	FTimerHandle PatrolTimer; // The world timer keeps tracks of the time in the game world
+	void PatrolTimerFinished(); // CALL BACK: The function that will be called when the timer is finished
+
+	UPROPERTY(EditAnywhere, Category = "AI Navigation")
+	float WaitMin = 5.f;
+	UPROPERTY(EditAnywhere, Category = "AI Navigation")
+	float WaitMax = 10.f;
 public:
 	
 };
