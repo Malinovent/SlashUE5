@@ -4,15 +4,17 @@
 #include "Enemy/Enemy.h"
 
 #include "Components/CapsuleComponent.h"
-#include "GameFramework/CharacterMovementComponent.h"
+#include "Components/AttributeComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "AIController.h"
-#include "Slash/DebugMacros.h"
+#include "Perception/PawnSensingComponent.h"
 #include "Animation/AnimMontage.h"
+#include "Characters/SlashCharacter.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Kismet/GameplayStatics.h"
-#include "Components/AttributeComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "HUD/HealthBarComponent.h"
+#include "Slash/DebugMacros.h"
 
 AEnemy::AEnemy()
 {
@@ -31,7 +33,12 @@ AEnemy::AEnemy()
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
-	
+
+	PawnSensingComponent = CreateDefaultSubobject<UPawnSensingComponent>(TEXT("PawnSensing"));
+	PawnSensingComponent->SetPeripheralVisionAngle(45);
+	PawnSensingComponent->SightRadius = 5000.f;
+	PawnSensingComponent->HearingThreshold = 1400;
+	PawnSensingComponent->OnSeePawn.AddDynamic(this, &AEnemy::OnSeePlayer);
 }
 
 
@@ -147,6 +154,17 @@ void AEnemy::CheckPatrolTarget()
 		CurrentPatrolTarget = ChoosePatrolTarget();
 		//MoveToTarget(CurrentPatrolTarget);
 		GetWorldTimerManager().SetTimer(PatrolTimer, this, &AEnemy::PatrolTimerFinished, FMath::RandRange(WaitMin, WaitMax)); //Gets the world timer manager
+	}
+}
+
+void AEnemy::OnSeePlayer(APawn* Pawn)
+{
+	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("I SEE SOMETHING"));
+	
+	if(ASlashCharacter* Player = Cast<ASlashCharacter>(Pawn))
+	{
+		//Go to chase
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("I SEE YOU"));
 	}
 }
 

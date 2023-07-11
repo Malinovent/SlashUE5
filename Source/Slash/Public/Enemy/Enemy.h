@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AIController.h"
 #include "GameFramework/Character.h"
 #include "Interfaces/HitInterface.h"
 #include "Characters/CharacterTypes.h"
@@ -12,7 +11,8 @@
 class UAnimMontage;
 class UAttributeComponent; 
 class UHealthBarComponent;
-class AIController;
+class AAIController;
+class UPawnSensingComponent;
 
 UCLASS()
 class SLASH_API AEnemy : public ACharacter, public IHitInterface
@@ -20,6 +20,7 @@ class SLASH_API AEnemy : public ACharacter, public IHitInterface
 	GENERATED_BODY()
 
 public:
+
 	AEnemy();
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -28,20 +29,9 @@ public:
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 	void CheckCombatTarget();
 	void CheckPatrolTarget();
+	void OnSeePlayer(APawn* Pawn);
 
-	UPROPERTY()
-	AAIController* EnemyController;
-	/**
-	* Navigation: Create an array of Patrol Targets, a current target and set them to be accessible in the editor
-	*/
-	UPROPERTY(EditAnywhere, Category = "AI Navigation")
-	AActor* CurrentPatrolTarget;
-	
-	UPROPERTY(EditAnywhere, Category = "AI Navigation")
-	TArray<AActor*> PatrolTargets;
 
-	UPROPERTY(EditAnywhere, Category = "AI Navigation")
-	double PatrolRadius = 200.f;
 	
 protected:
 	virtual void BeginPlay() override;
@@ -82,13 +72,36 @@ private:
 	UPROPERTY(EditAnywhere)
 	double CombatRadius = 50.f;
 
-	FTimerHandle PatrolTimer; // The world timer keeps tracks of the time in the game world
+	FTimerHandle PatrolTimer;  // The world timer keeps tracks of the time in the game world
 	void PatrolTimerFinished(); // CALL BACK: The function that will be called when the timer is finished
 
+	
+	UPROPERTY()
+	AAIController* EnemyController;
+	/**
+	* Navigation: Create an array of Patrol Targets, a current target and set them to be accessible in the editor
+	*/
+	UPROPERTY(EditAnywhere, Category = "AI Navigation", BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	AActor* CurrentPatrolTarget;
+	
+	UPROPERTY(EditAnywhere, Category = "AI Navigation")
+	TArray<AActor*> PatrolTargets;
+	
+	UPROPERTY(EditAnywhere, Category = "AI Navigation")
+	double PatrolRadius = 200.f;
+	
 	UPROPERTY(EditAnywhere, Category = "AI Navigation")
 	float WaitMin = 5.f;
+	
 	UPROPERTY(EditAnywhere, Category = "AI Navigation")
 	float WaitMax = 10.f;
+
+	/**
+	* Sensing: 
+	*/
+	UPROPERTY(VisibleAnywhere, Category = "AI Sensing")
+	UPawnSensingComponent* PawnSensingComponent;
+	
 public:
 	
 };
