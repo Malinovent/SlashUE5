@@ -34,11 +34,10 @@ AEnemy::AEnemy()
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	PawnSensingComponent = CreateDefaultSubobject<UPawnSensingComponent>(TEXT("PawnSensing"));
-	PawnSensingComponent->SetPeripheralVisionAngle(45);
-	PawnSensingComponent->SightRadius = 5000.f;
-	PawnSensingComponent->HearingThreshold = 1400;
-	PawnSensingComponent->OnSeePawn.AddDynamic(this, &AEnemy::OnSeePlayer);
+	PawnSensing = CreateDefaultSubobject<UPawnSensingComponent>(TEXT("PawnSensing"));
+	PawnSensing->SetPeripheralVisionAngle(45);
+	PawnSensing->SightRadius = 5000.f;
+	
 }
 
 
@@ -56,7 +55,10 @@ void AEnemy::BeginPlay()
 
 	MoveToTarget(CurrentPatrolTarget);
 
-	
+	if (PawnSensing)
+	{
+		PawnSensing->OnSeePawn.AddDynamic(this, &AEnemy::PawnSeen);
+	}
 }
 
 void AEnemy::GetHit_Implementation(const FVector& ImpactPoint)
@@ -139,6 +141,7 @@ float AEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AC
 
 void AEnemy::CheckCombatTarget()
 {
+	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("COMBAT"));
 	//If there is no combat target in the combat radius, then go back to business
 	if(!InTargetRange(CombatTarget, CombatRadius))
 	{
@@ -149,6 +152,7 @@ void AEnemy::CheckCombatTarget()
 
 void AEnemy::CheckPatrolTarget()
 {
+	//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("PATROLLING"));
 	if(InTargetRange(CurrentPatrolTarget, PatrolRadius))
 	{
 		CurrentPatrolTarget = ChoosePatrolTarget();
@@ -157,14 +161,18 @@ void AEnemy::CheckPatrolTarget()
 	}
 }
 
-void AEnemy::OnSeePlayer(APawn* Pawn)
+void AEnemy::PawnSeen(APawn* SeenPawn)
 {
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("I SEE SOMETHING"));
-	
-	if(ASlashCharacter* Player = Cast<ASlashCharacter>(Pawn))
+	UE_LOG(LogTemp, Warning, TEXT("Pawn Seen!"));
+	if(CurrentState == EEnemyState::EES_Chasing) return;	//If already chasing, don't do anything	
+	if(SeenPawn->ActorHasTag("SlashCharacter"))
 	{
 		//Go to chase
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("I SEE YOU"));
+		CurrentState = EEnemyState::EES_Chasing;
+		GetWorldTimerManager().ClearTimer(PatrolTimer);
+		CombatTarget = SeenPawn;
+		MoveToTarget(CombatTarget);
 	}
 }
 
@@ -172,9 +180,14 @@ void AEnemy::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	CheckCombatTarget();
-	CheckPatrolTarget();
-	
+	if(CurrentState > EEnemyState::EES_Patrolling)
+	{
+		CheckCombatTarget();
+	}
+	else
+	{
+		CheckPatrolTarget();
+	}
 }
 
 

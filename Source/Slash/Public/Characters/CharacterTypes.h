@@ -21,5 +21,8 @@ enum class EEnemyState : uint8
 {
 	EES_Idle UMETA(DisplayName = "Idle"),
 	EES_Dead UMETA(DisplayName = "Dead"),
-	EES_Dying UMETA(DisplayName = "Dying")
+	EES_Dying UMETA(DisplayName = "Dying"),
+	EES_Patrolling UMETA(DisplayName = "Patrolling"),
+	EES_Chasing UMETA(DisplayName = "Chase"),
+	EES_Attacking UMETA(DisplayName = "Attacking"),
 };

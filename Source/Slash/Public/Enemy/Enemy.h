@@ -29,7 +29,8 @@ public:
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 	void CheckCombatTarget();
 	void CheckPatrolTarget();
-	void OnSeePlayer(APawn* Pawn);
+	UFUNCTION()
+	void PawnSeen(APawn* Pawn);
 
 
 	
@@ -42,7 +43,7 @@ protected:
 	AActor* ChoosePatrolTarget();
 	
 	UPROPERTY(BlueprintReadWrite)
-	EEnemyState CurrentState = EEnemyState::EES_Idle;
+	EEnemyState CurrentState = EEnemyState::EES_Patrolling;
 
 	
 
@@ -100,7 +101,7 @@ private:
 	* Sensing: 
 	*/
 	UPROPERTY(VisibleAnywhere, Category = "AI Sensing")
-	UPawnSensingComponent* PawnSensingComponent;
+	UPawnSensingComponent* PawnSensing;
 	
 public:
 	
