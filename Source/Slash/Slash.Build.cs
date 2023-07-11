@@ -16,7 +16,9 @@ public class Slash : ModuleRules
 			"InputCore", 
 			"EnhancedInput", 
 			"HairStrandsCore",
-			"Niagara"
+			"Niagara",
+			"GeometryCollectionEngine",
+			"UMG"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });

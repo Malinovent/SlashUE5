@@ -9,8 +9,11 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GroomComponent.h"
-#include "Item.h"
+#include "Items/Item.h"
 #include "Items/Weapons/Weapon.h"
+#include "Animation/AnimMontage.h"
+#include "Components/BoxComponent.h"
+#include "Widgets/Text/ISlateEditableTextWidget.h"
 
 
 // Sets default values
@@ -57,6 +60,27 @@ void ASlashCharacter::BeginPlay()
 	}
 }
 
+void ASlashCharacter::Disarm()
+{
+	if(EquippedWeapon)
+	{
+		EquippedWeapon->AttachMeshToSocket(GetMesh(), "SpineSocket");
+	}
+}
+
+void ASlashCharacter::Arm()
+{
+	if(EquippedWeapon)
+	{
+		EquippedWeapon->AttachMeshToSocket(GetMesh(), "RightHandSocket");
+	}
+}
+
+void ASlashCharacter::FinishEquipping()
+{
+	ActionState = EActionState::EAS_Unoccupied;
+}
+
 // Called every frame
 void ASlashCharacter::Tick(float DeltaTime)
 {
@@ -64,16 +88,23 @@ void ASlashCharacter::Tick(float DeltaTime)
 
 }
 
+void ASlashCharacter::AttackEnd()
+{
+	ActionState = EActionState::EAS_Unoccupied;
+}
+
 void ASlashCharacter::Move(const FInputActionValue& Value)
 {
+	if(ActionState != EActionState::EAS_Unoccupied) { return; }
+	
 	const FVector2D DirectionValue = Value.Get<FVector2D>();
 
 	const FRotator YawRotation(0.f, GetControlRotation().Yaw, 0.f);
 
-	const FVector directionX = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-	const FVector directionY = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-	AddMovementInput(directionX, DirectionValue.Y);
-	AddMovementInput(directionY, DirectionValue.X);
+	const FVector DirectionX = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+	const FVector DirectionY = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+	AddMovementInput(DirectionX, DirectionValue.Y);
+	AddMovementInput(DirectionY, DirectionValue.X);
 }
 
 void ASlashCharacter::Look(const FInputActionValue& Value)
@@ -85,14 +116,112 @@ void ASlashCharacter::Look(const FInputActionValue& Value)
 
 void ASlashCharacter::EKeyPressed(const FInputActionValue& Value)
 {
-	AWeapon* OverlappingWeapon = Cast<AWeapon>(OverlappingItem);
-	
-	if(OverlappingWeapon)
+	if(AWeapon* OverlappingWeapon = Cast<AWeapon>(OverlappingItem))
 	{
-		OverlappingWeapon->Equip(GetMesh(), FName("RightHandSocket"));
+		OverlappingWeapon->Equip(GetMesh(), FName("RightHandSocket"), this, this);
+
 		CharacterState = ECharacterState::ECS_EquippedOneHandedWeapon;
+		OverlappingItem = nullptr;
+		EquippedWeapon = OverlappingWeapon;
+	}
+	else 
+	{
+		if(CanDisarm())
+		{
+			PlayEquipMontage((FName("Unequip")));
+			CharacterState = ECharacterState::ECS_Unequipped;
+			ActionState = EActionState::EAS_EquippingWeapon;
+		}
+		else if(CanArm())
+		{
+			PlayEquipMontage((FName("Equip")));
+			CharacterState = ECharacterState::ECS_EquippedOneHandedWeapon;
+			ActionState = EActionState::EAS_EquippingWeapon;
+		}
 	}
 }
+
+bool ASlashCharacter::CanDisarm() const
+{	
+	return ActionState == EActionState::EAS_Unoccupied &&
+		CharacterState != ECharacterState::ECS_Unequipped;
+}
+
+bool ASlashCharacter::CanArm() const
+{
+	return ActionState == EActionState::EAS_Unoccupied &&
+		CharacterState == ECharacterState::ECS_Unequipped && 
+		EquippedWeapon;
+	
+}
+
+bool ASlashCharacter::CanAttack() const
+{
+	return ActionState == EActionState::EAS_Unoccupied &&
+		CharacterState == ECharacterState::ECS_EquippedOneHandedWeapon;
+}
+
+void ASlashCharacter::Attack(const FInputActionValue& Value)
+{
+	if(CanAttack())
+	{
+		PlayAttackMontage();
+		ActionState = EActionState::EAS_Attacking;
+	}
+}
+
+void ASlashCharacter::SwitchWeapon(const FInputActionValue& Value)
+{
+	if(CharacterState == ECharacterState::ECS_Unequipped){return;}
+
+	if(CharacterState == ECharacterState::ECS_EquippedMagic)
+	{
+		CharacterState = ECharacterState::ECS_EquippedOneHandedWeapon;
+	}
+	else
+	{
+		CharacterState = ECharacterState::ECS_EquippedMagic;
+	}
+
+	if(GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("CharacterState: %s"), *UEnum::GetValueAsString(CharacterState)));
+	}
+}
+
+
+void ASlashCharacter::PlayAttackMontage() const
+{
+	if(UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	{
+		AnimInstance->Montage_Play(AttackMontage);
+		const int32 Selection = FMath::RandRange(0,1);
+		FName SectionName = FName();
+		
+		switch(Selection)
+		{
+		case 0:
+			SectionName = FName("Attack1");
+			break;
+		case 1:
+			SectionName = FName("Attack2");
+			break;
+		default: ;
+		}
+		AnimInstance->Montage_JumpToSection(SectionName, AttackMontage);
+	}
+}
+
+void ASlashCharacter::PlayEquipMontage(FName SectionName) const
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if(AnimInstance && EquipMontage)
+	{
+		AnimInstance->Montage_Play(EquipMontage);
+		AnimInstance->Montage_JumpToSection(SectionName, EquipMontage);
+	}
+}
+
 
 
 // Called to bind functionality to input
@@ -107,6 +236,17 @@ void ASlashCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ASlashCharacter::Look);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
 		EnhancedInputComponent->BindAction(EquipAction, ETriggerEvent::Triggered, this, &ASlashCharacter::EKeyPressed);
+		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Triggered, this, &ASlashCharacter::Attack);
+		EnhancedInputComponent->BindAction(SwitchWeaponAction, ETriggerEvent::Triggered, this, &ASlashCharacter::SwitchWeapon);
+	}
+}
+
+void ASlashCharacter::SetWeaponCollisionEnabled(ECollisionEnabled::Type CollisionEnabled)
+{
+	if(EquippedWeapon && EquippedWeapon->GetWeaponBox())
+	{
+		EquippedWeapon->GetWeaponBox()->SetCollisionEnabled(CollisionEnabled);
+		EquippedWeapon->HitActors.Empty();
 	}
 }
 
