@@ -78,6 +78,7 @@ void AEnemy::GetHit_Implementation(const FVector& ImpactPoint)
 		UGameplayStatics::PlaySoundAtLocation(this, HitSound, GetActorLocation());
 		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), HitParticles, ImpactPoint);
 	}
+	
 }
 
 void AEnemy::DirectionalHitReact(const FVector& ImpactPoint)
@@ -135,6 +136,12 @@ float AEnemy::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AC
 		}
 	}
 
+	if(CurrentState != EEnemyState::EES_Chasing || CurrentState != EEnemyState::EES_Attacking)
+	{
+		CurrentState = EEnemyState::EES_Chasing;
+		MoveToTarget(CombatTarget);
+	}
+
 	return DamageAmount;
 }
 
@@ -147,7 +154,26 @@ void AEnemy::CheckCombatTarget()
 	{
 		CombatTarget = nullptr;
 		if(HealthBarWidget) HealthBarWidget->SetVisibility(false);
+		CurrentState = EEnemyState::EES_Patrolling;
+		MoveToTarget(CurrentPatrolTarget);
+		UE_LOG(LogTemp, Warning, TEXT("Lose Interest"));
 	}
+	else if(!InTargetRange(CombatTarget, AttackRadius) && CurrentState != EEnemyState::EES_Chasing)
+	{
+		//Outside attack range, chase character
+		CurrentState = EEnemyState::EES_Chasing;
+		GetCharacterMovement()->MaxWalkSpeed = 300;
+		MoveToTarget(CombatTarget);
+		UE_LOG(LogTemp, Warning, TEXT("Chasing"));
+	}
+	else if(InTargetRange(CombatTarget, AttackRadius) && CurrentState != EEnemyState::EES_Attacking)
+	{
+		//Inside attack range, attack character
+		CurrentState = EEnemyState::EES_Attacking;
+		UE_LOG(LogTemp, Warning, TEXT("Attack"));
+
+	}
+	
 }
 
 void AEnemy::CheckPatrolTarget()
@@ -163,16 +189,21 @@ void AEnemy::CheckPatrolTarget()
 
 void AEnemy::PawnSeen(APawn* SeenPawn)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Pawn Seen!"));
+	//UE_LOG(LogTemp, Warning, TEXT("Pawn Seen!"));
 	if(CurrentState == EEnemyState::EES_Chasing) return;	//If already chasing, don't do anything	
 	if(SeenPawn->ActorHasTag("SlashCharacter"))
 	{
 		//Go to chase
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("I SEE YOU"));
-		CurrentState = EEnemyState::EES_Chasing;
+		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("I SEE YOU"));
 		GetWorldTimerManager().ClearTimer(PatrolTimer);
+		GetCharacterMovement()->MaxWalkSpeed = 300;
 		CombatTarget = SeenPawn;
-		MoveToTarget(CombatTarget);
+		
+		if(CurrentState != EEnemyState::EES_Attacking)
+		{
+			CurrentState = EEnemyState::EES_Chasing;
+			MoveToTarget(CombatTarget);
+		}
 	}
 }
 

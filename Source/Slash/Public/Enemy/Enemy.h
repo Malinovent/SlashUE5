@@ -71,7 +71,10 @@ private:
 	AActor* CombatTarget;
 	
 	UPROPERTY(EditAnywhere)
-	double CombatRadius = 50.f;
+	double CombatRadius = 500.f;
+
+	UPROPERTY(EditAnywhere)
+	double AttackRadius = 150.f;
 
 	FTimerHandle PatrolTimer;  // The world timer keeps tracks of the time in the game world
 	void PatrolTimerFinished(); // CALL BACK: The function that will be called when the timer is finished
